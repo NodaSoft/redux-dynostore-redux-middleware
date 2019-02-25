@@ -4,7 +4,7 @@ import attachMiddleware from './attachMiddleware';
 
 const processAction = (namespace) => (action, callback, fallback) => {
   if (namespace && !isGlobal(action) && hasNamespace(action, namespace)) {
-    return callback(action);
+    return callback({...action, type: action.type.substring(namespace.length + 1)});
   }
   return fallback(action)
 };
