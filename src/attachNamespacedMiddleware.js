@@ -2,16 +2,17 @@ import isGlobal from './helpers/isGlobal';
 import hasNamespace from './helpers/hasNamespace';
 import attachMiddleware from './attachMiddleware';
 
-const processAction = (namespace) => (action, callback) => {
+const processAction = (namespace) => (action, callback, fallback) => {
   if (namespace && !isGlobal(action) && hasNamespace(action, namespace)) {
     return callback(action);
   }
+  return fallback(action)
 };
 
 const namespaced = (namespace) => {
   const actionProcessor = processAction(namespace);
   return (middleware) => (store) => (next) => (action) => (
-    actionProcessor(action, (transformedAction) => middleware(store)(next)(transformedAction))
+    actionProcessor(action, (action) => middleware(store)(next)(action), (action) => next(action))
   );
 };
 
