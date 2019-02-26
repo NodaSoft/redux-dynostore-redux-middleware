@@ -4,7 +4,7 @@
   "description": "",
   "main": "lib/index.js",
   "scripts": {
-    "develop": "babel --watch --out-dir ./lib ./src",
+    "develop": "rm -rf ./lib && babel --watch --out-dir ./lib ./src",
     "build": "babel --out-dir ./lib ./src",
     "prepublish": "npm run build"
   },
