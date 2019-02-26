@@ -57,7 +57,7 @@ export default (middleware) => identifier => {
   return store => {
     const storeNamespace = store.namespace;
     const namespacedIdentifier = storeNamespace ? `${storeNamespace}/${identifier}` : identifier;
-    // const middlewareToAttach = storeNamespace ? namespaced(storeNamespace)(namespacedMiddleware) : namespacedMiddleware;
-    return attachMiddleware(namespacedMiddleware(store))(namespacedIdentifier)(store);
+    const middlewareToAttach = storeNamespace ? namespaced(storeNamespace)(namespacedMiddleware) : namespacedMiddleware;
+    return attachMiddleware(middlewareToAttach(store))(namespacedIdentifier)(store);
   }
 };
