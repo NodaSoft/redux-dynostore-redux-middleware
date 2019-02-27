@@ -1,5 +1,5 @@
 import attachMiddleware from './attachMiddleware';
-import { namespacedAction, globalAction } from 'redux-subspace';
+import { namespacedAction } from 'redux-subspace';
 
 /**
  * Do action have namespace
@@ -31,7 +31,7 @@ const isGlobal = (action) => !action.type || action.globalAction === true || act
 const processAction = (namespace) => (action, middleware, next) => {
   if (namespace && !isGlobal(action) && hasNamespace(action, namespace)) {
     // run middleware with modified next function which runs namespaced action
-    return middleware((action) => next(globalAction(namespacedAction(namespace)(action))))({
+    return middleware((action) => next(namespacedAction(namespace)(action))))({
       ...action,
       type: action.type.substring(namespace.length + 1)
     });
@@ -57,7 +57,6 @@ export default (middleware) => identifier => {
   return store => {
     const storeNamespace = store.namespace;
     const namespacedIdentifier = storeNamespace ? `${storeNamespace}/${identifier}` : identifier;
-    const middlewareToAttach = storeNamespace ? namespaced(storeNamespace)(namespacedMiddleware) : namespacedMiddleware;
-    return attachMiddleware(middlewareToAttach(store))(namespacedIdentifier)(store);
+    return attachMiddleware(namespacedMiddleware(store))(namespacedIdentifier)(store);
   }
 };
