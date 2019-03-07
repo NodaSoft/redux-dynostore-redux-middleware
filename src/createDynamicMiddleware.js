@@ -1,24 +1,35 @@
 import { compose } from 'redux';
-import _mapKeys from 'lodash/mapKeys';
 import _omit from 'lodash/omit';
-import _values from 'lodash/values';
-
 /**
- * Create dynastore handler for dynamic middlewares
+ * Action types for logger
+ * @type {string}
  */
-export default () => createHandlers => (store, ...params) => {
+const PREFIX = '@@DYNOSTORE/MIDDLEWARES';
+const ATTACH_MIDDLEWARES = `${PREFIX}/ATTACH_MIDDLEWARES`;
+const DETACH_MIDDLEWARES = `${PREFIX}/DETACH_MIDDLEWARES`;
+const RESET_MIDDLEWARES = `${PREFIX}/RESET_MIDDLEWARES`;
+const UNKNOWN_TYPE = `${PREFIX}/UNKNOWN_TYPE`;
+/**
+ * Action type map
+ */
+const actionTypes = {
+  attach: ATTACH_MIDDLEWARES,
+  detach: DETACH_MIDDLEWARES,
+  reset: RESET_MIDDLEWARES,
+  default: UNKNOWN_TYPE
+};
+const getActionName = type => actionTypes[type] ? actionTypes[type] : actionTypes.default;
+const storeLogger = (store) => (type, params) => store.dispatch({ type: getActionName(type), ...params });
+/**
+ * Create dynostore handler for dynamic middlewares
+ */
+export default (createLogger = storeLogger) => createHandlers => (store, ...params) => {
   let dynamicMiddlewares = {};
+  let log = createLogger(store);
 
   const enhancer = store => next => action => {
-    const chain = _values(_mapKeys(dynamicMiddlewares, middleware => middleware(store)));
+    const chain = Object.values(dynamicMiddlewares).map(middleware => middleware(store));
     return compose(...chain)(next)(action);
-  };
-
-  const attachMiddleware = (middleware, key) => {
-    dynamicMiddlewares = {
-      ...dynamicMiddlewares,
-      [key]: middleware,
-    };
   };
 
   const attachMiddlewares = (middlewares) => {
@@ -26,22 +37,23 @@ export default () => createHandlers => (store, ...params) => {
       ...dynamicMiddlewares,
       ...middlewares
     };
+    log('attach', { keys: Object.keys(middlewares) });
   };
 
   const detachMiddleware = (...keys) => {
     dynamicMiddlewares = _omit(dynamicMiddlewares, keys);
+    log('detach', { keys });
   };
 
   const resetMiddlewares = () => {
     dynamicMiddlewares = {};
-    dynamicMiddlewareRunner(dynamicMiddlewares);
+    log('reset');
   };
 
   const handlers = createHandlers(store, ...params);
   return {
     ...handlers,
     dynamicMiddlewaresEnhancer: enhancer,
-    attachMiddleware,
     attachMiddlewares,
     detachMiddleware,
     resetMiddlewares,

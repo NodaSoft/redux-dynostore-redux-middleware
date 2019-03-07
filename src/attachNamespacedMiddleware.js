@@ -1,6 +1,6 @@
 import attachMiddleware from './attachMiddleware';
 import { namespacedAction } from 'redux-subspace';
-
+import { compose } from 'redux';
 /**
  * Do action have namespace
  * @param action
@@ -20,21 +20,27 @@ const REDUX_PREFIX = '@@redux/';
  */
 const isGlobal = (action) => !action.type || action.globalAction === true || action.type.startsWith(REDUX_PREFIX);
 /**
+ * Detach actions prefix
+ * @param namespace
+ * @returns {function(*): {type: string}}
+ */
+const denamespacedAction = namespace => action => ({ ...action, type: action.type.substring(namespace.length + 1) });
+/**
  * Function create a handler for adaptation action toward middleware processing
  * action {object} original action
- * callback {Function(middlewareAction, originalAction)}
- * fallback {Function(action)} default callback escapes namespaced middleware
- *
  * @param namespace
- * @returns {Function(action, callback, fallback)}
+ * @returns {function}
  */
-const processAction = (namespace) => (action, middleware, next) => {
+const processAction = (namespace) => (action, middleware, next, store) => {
   if (namespace && !isGlobal(action) && hasNamespace(action, namespace)) {
-    // run middleware with modified next function which runs namespaced action
-    return middleware((action) => next(namespacedAction(namespace)(action)))({
-      ...action,
-      type: action.type.substring(namespace.length + 1)
-    });
+    // Patch next function to add namespace to action
+    const patchedNext = action => next(namespacedAction(namespace)(action));
+    const patchedStore = {
+      getState: () => store.getState()[namespace],
+      dispatch: (action) => store.dispatch(namespacedAction(namespace)(action))
+    };
+    // Run middleware with action without namespace
+    return middleware(patchedStore)(patchedNext)(denamespacedAction(namespace)(action));
   }
   // fallback for global actions - no namespaced middlewares
   return next(action);
@@ -47,16 +53,26 @@ const processAction = (namespace) => (action, middleware, next) => {
 const namespaced = (namespace) => {
   const actionProcessor = processAction(namespace);
   return (middleware) => (store) => (next) => (action) => (
-    actionProcessor(action, middleware(store), next)
+    actionProcessor(action, middleware, next, store)
   );
 };
-
-
-export default (middleware) => identifier => {
-  const namespacedMiddleware = namespaced(identifier)(middleware);
+/**
+ * Compose middlewares into one function
+ * @param middlewares
+ * @returns {function}
+ */
+const getComposedMiddleware = middlewares => (store) => compose(...middlewares.map(middleware => middleware(store)));
+/**
+ * Attach middlewares to store
+ * @param middlewares
+ * @returns {function(*=): function(*=): *}
+ */
+export default (...middlewares) => identifier => {
+  const composedMiddleware = getComposedMiddleware(middlewares);
+  const namespacedMiddleware = namespaced(identifier)(composedMiddleware);
   return store => {
     const storeNamespace = store.namespace;
     const namespacedIdentifier = storeNamespace ? `${storeNamespace}/${identifier}` : identifier;
-    return attachMiddleware(namespacedMiddleware(store))(namespacedIdentifier)(store);
+    return attachMiddleware(namespacedMiddleware)(namespacedIdentifier)(store);
   }
 };
